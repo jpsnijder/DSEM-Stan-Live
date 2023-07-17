@@ -1,0 +1,132 @@
+---
+title: "Sim example - Model 2"
+format:
+  html:
+    toc: true
+    number-sections: true
+    colorlinks: true
+    code-fold: true
+    code-summary: "Show the code"
+    embed-resources: true
+---
+
+First, load the libraries and functions that will be needed later on:
+```{r}
+#| label: setup
+#| output: false
+#| include: false
+
+# Install packages if not owned; then load packages
+packages <- c("tidyverse", "MplusAutomation", "cmdstanr", "bayesplot", "RColorBrewer", "MASS", "igraph", "ggpubr")
+install.packages(setdiff(packages, rownames(installed.packages())))
+for (i in packages){
+  library(i, character.only = TRUE)
+}
+
+source("source/rlkjcorr.R")
+source("source/loadFunction.R")
+LoadFunction(file="source/results.r", rhat_comp_bars, est_comp_sim)
+```
+
+# Simulated Data
+
+## Setup vars and create new folder for Mplus output
+```{r}
+modelName <- "sim_model2"
+path_mplus <- paste0("mplus/", modelName, "/")
+dir.create(path_mplus, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Loading data
+Load in the pre-simulated data:
+```{r}
+data_list <- readRDS("data/sim_model2/data_list.rds")
+N_subj <- data_list$N_subj
+N_obs <- data_list$N_obs
+# Parameters used to simulated data:
+gamma = c(3.0, 1.0, .2, .25, .05, .3, -1.6, -1.4)
+```
+
+For the model with missing data, we randomly declare 5% of the rows as missing
+and save the subject and observation index of the missing data into ii_mis.
+```{r}
+mis_long = sample(0:(N_subj*N_obs-1), 0.05 * N_subj * N_obs)
+N_mis = length(mis_long)
+ii_mis = matrix(NA, nrow = N_mis, ncol = 2)
+ii_mis[,1] = (mis_long %% N_subj) + 1
+ii_mis[,2] = (mis_long %/% N_subj) + 1
+```
+
+For use in Stan, we add the missingness data to the data_list:
+```{r}
+data_list$N_mis = N_mis
+data_list$ii_mis = ii_mis
+```
+
+For those have Mplus, `MplusAutomation` provides a data preparation function:
+```{r}
+mplus <- data.frame(id = rep(1:N_subj, each = N_obs),
+                                     day = rep(1:N_obs, times = N_subj),
+                                     X = as.vector(t(data_list$X)),
+                                     Y = as.vector(t(data_list$Y)))
+# replace missing data with -999
+for (r in 1:nrow(ii_mis)) {
+  pattern = ii_mis[r,]
+  mplus[mplus[1] == pattern[1] & mplus$day == pattern[2],3] = -999
+  mplus[mplus[1] == pattern[1] & mplus$day == pattern[2],4] = -999
+}
+
+mplus <- mplus[order(mplus$id),]
+dir.create("mplus", showWarnings = FALSE)
+mplus_txt <- prepareMplusData(mplus, "mplus/mplus.dat")
+```
+
+
+# Model 2
+Next, we can compile the model and fit the data. 
+```{r}
+#| output: false
+#| include: false
+
+##### Control Panel ##### 
+parallel::detectCores() # how many cores are available on your machine?
+WCP = FALSE #!!! Within Chain Paralellization, only set to `TRUE` when enough cores are available !!!
+# with Chains = 4 and CorePerChain = 4, requires 16 cores. 
+modelNr = 2
+Chains = 4
+ParallelChains = 4
+CorePerChain = 4 # requires WCP = TRUE
+Burnin = 500
+Iters = 3000
+#####  Control Panel##### 
+
+# WCP Model 2 Simple
+path_s <- paste0('fits/', modelName, '_', modelNr, '_simple')
+data_s <- data_list[1:4]
+
+
+# WCP Model 2 Reparam
+path_r <- paste0('fits/', modelName, '_', modelNr, '_reparam')
+data_r <- data_list[1:4]
+
+
+# WCP Model 2 Full
+path_f <- paste0('fits/', modelName, '_', modelNr, '_full')
+data_f <- data_list
+
+# run 
+source("source/run.r")
+
+# Mplus - Run only when Mplus is installed on computer
+# For non-Mplus user, the output has been pre-loaded.
+runModels("mplus/model_2.inp")
+source("source/mplusStore.r")
+```
+
+# Results - M2
+Next, we can compile the model and fit the data. 
+```{r}
+modelNr = 2
+rhat_comp_bars(savePlots = TRUE)
+est_comp_sim(savePlots = TRUE)
+```
