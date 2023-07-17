@@ -1,3 +1,4 @@
+# Same as 2_simple, but with within-chain parallelization
 functions {
   real partial_sum_ll(array[] int slice, int start, int end,
   int N_obs, vector gamma, array[] vector u, matrix Omega,

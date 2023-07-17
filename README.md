@@ -13,6 +13,8 @@ A PDF of the chapter made available by the authors themself here: [PDF](https://
 
 Currently, we'll make model 2 available as part of a conference presentation at MathPsych 23.
 
+N.B., make sure to the open the Rproject file first, as all paths are relative to the location of that file.
+
 
 
 

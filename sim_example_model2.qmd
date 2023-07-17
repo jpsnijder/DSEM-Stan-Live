@@ -10,6 +10,8 @@ format:
     embed-resources: true
 ---
 
+N.B., make sure to the open the Rproject file first, as all paths are relative to the location of that file.
+
 First, load the libraries and functions that will be needed later on:
 ```{r}
 #| label: setup
@@ -90,12 +92,14 @@ Next, we can compile the model and fit the data.
 
 ##### Control Panel ##### 
 parallel::detectCores() # how many cores are available on your machine?
+
 WCP = FALSE #!!! Within Chain Paralellization, only set to `TRUE` when enough cores are available !!!
 # with Chains = 4 and CorePerChain = 4, requires 16 cores. 
+
 modelNr = 2
 Chains = 4
 ParallelChains = 4
-CorePerChain = 4 # requires WCP = TRUE
+CorePerChain = 4 # only works with WCP = TRUE
 Burnin = 500
 Iters = 3000
 #####  Control Panel##### 
