@@ -1,19 +1,17 @@
-# Dynamic Structural Equation Models in Stan - Public Repo
+# Dynamic Structural Equation Models in Stan - Public Repository
 
 ## statement:
 
-!This is a work in progress, and the models are still being tested on different data sets!
-
-Snijder, Pratz, and Schubert are writing a combined Stan/DSEM tutorial paper.
-Over the summer 2023 we'll add more resources here.
+Due to many requests, I have decided to upload the Stan models and some preliminary results of the Stan models for the upcoming DSEM Stan tutorial paper by Snijder, Pratz, and Schubert.
+Although this is a work in progress, the Stan models have been thouroughly tested (see .htmls).
 
 The `stan` implementation of Mplus DSEM models 
 correspond to Hamaker et al., 2023 book chapter in the handbook of SEMs, models 1 - 6.
 A PDF of the chapter made available by the authors themself here: [PDF](https://ellenhamaker.github.io/DSEM-demo-videos/#Introduction).
 
-Currently, we'll make model 2 available as part of a conference presentation at MathPsych 23.
-
 N.B., make sure to the open the Rproject file first, as all paths are relative to the location of that file.
+
+Presentations might be of help as well and can be found at [GITHUB](https://github.com/jpsnijder/conference-materials), look for the ESCoP, FGME, and MathPsych 2023 presentations. 
 
 
 

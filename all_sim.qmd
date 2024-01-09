@@ -1,0 +1,947 @@
+---
+title: "Running all models on Simulated Data"
+format:
+  html:
+    toc: true
+    number-sections: true
+    colorlinks: true
+    code-fold: true
+    code-summary: "Show the code"
+    embed-resources: true
+---
+
+First, load the libraries and functions that will be needed later on:
+```{r}
+#| label: setup
+#| output: false
+library(tidyverse) 
+library(MplusAutomation)
+library(cmdstanr)
+library(bayesplot)
+library(RColorBrewer)
+library(MASS)
+library(igraph)
+library(ggpubr)
+
+source("source/rlkjcorr.R")
+source("source/loadFunction.R")
+LoadFunction(file="source/results.r", rhat_comp_F_MP, est_comp_F_MP)
+
+set_cmdstan_path(file.path("C:/ProgramData/cmdstan-2.33.1"))
+
+set.seed(123)
+N_subj = 100
+N_obs = 50
+
+varsNames = c("X", "Y", "phi_X", "phi_Y", "phi_XY", "beta_YX", "psi_X", "psi_Y")
+
+# should become a source function
+# this is for the within structure of the Hamaker et al., 2023 book chapter.
+# it is the same across all 6 models.
+simulate_within <- function(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs) {
+  X = rnorm(n=N_obs, 0, psi_X)
+  Y = rnorm(n=N_obs, 0, psi_Y)
+  for (t in 2:N_obs) {
+    # iteratively add the regressive components
+    Y[t] = Y[t] + phi_Y * Y[t-1] + phi_XY * X[t-1]
+    X[t] = X[t] + phi_X * X[t-1] + beta_YX * Y[t]
+  }
+  # shift by individual mean
+  X = X + mu_X
+  Y = Y + mu_Y
+  return(list(X=X,Y=Y))
+}
+
+data_summary_plot <- function(X,Y) {
+  par(mfrow=c(2,1), mar=c(4,4,0,0))
+  plot(1:N_obs, apply(X, 2, min), ylim = c(min(X),max(X)), type='b', xlab = "", "ylab" = "X")
+  lines(1:N_obs, apply(X, 2, max), type='b')
+  lines(1:N_obs, apply(X, 2, mean), type='b')
+  plot(1:N_obs, apply(Y, 2, min), ylim = c(min(Y),max(Y)), type='b', xlab = "Time", "ylab" = "Y")
+  lines(1:N_obs, apply(Y, 2, max), type='b')
+  lines(1:N_obs, apply(Y, 2, mean), type='b')
+}
+```
+
+Then we can set some general parameters that will be the same across the simulations:
+
+```{r}
+#| label: params
+modelNr = 1
+modelName = "hamaker model 1"
+```
+
+# Model 1
+## Simulating data
+In the first part of this tutorial, we will work with simulated data for two main reasons: First, when using simulated data, the *generating parameter values* (sometimes denoted as *ground truth*) are known. Thereby we can check the recovery of the chosen set of parameters. Second, we are free to specify the characteristics of the data set (number of subjects, variables, measurement points, ...). To keep this tutorial concise, we will stick to the most simple case and use bivariate data. Please refer to the paper for reference on which parameters indicate what:
+```{r}
+#| label: simulate-parameters-1
+phi_X = .2
+phi_Y = .25
+phi_XY = .05
+beta_YX = 0.3
+
+psi_X = .2
+psi_Y = .25
+
+gamma = c(3.0, 1.0)
+var_gamma = c(1.8, 0.6)  # variances of parameter
+# Construct the covariance matrix from the variances and a random correlation
+# matrix drawn from a LKJ-distribution. Higher values for eta indicate that
+# high correlations become more unlikely.
+Omega = diag(sqrt(var_gamma)) %*% rlkjcorr(n=1,K=2,eta=100.0) %*% diag(sqrt(var_gamma))
+# Omega = diag(var_gamma)
+# random individual parameters
+u = mvrnorm(N_subj, rep(0, 2), Sigma = Omega)
+
+
+# Given those parameter values, we can now simulate a data set that reflects the model specification:
+set.seed(2023)
+# Prepare array to store the data in arrays of dimensions(N_subj, N_obs)
+X = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+Y = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+for (i in 1:N_subj) {
+  # calculate within-person parameters
+  mu_X = u[i,1] + gamma[1]
+  mu_Y = u[i,2] + gamma[2]
+  # simulate data for one person
+  subj_data <- simulate_within(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs)
+  # store simulations in result vector
+  X[i,] = subj_data$X
+  Y[i,] = subj_data$Y
+}
+
+# For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+
+data_summary_plot(X,Y)
+
+#For use in Stan, we compile all necessary data into a `list`:
+data_list = list(
+  N_obs = N_obs,
+  N_subj = N_subj,
+  X = X,
+  Y = Y,
+  N_mis_X = 0,
+  N_mis_Y = 0,
+  ii_mis_X = c(),
+  ii_mis_Y = c()
+)
+```
+
+Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
+```{r}
+model_1 <- cmdstan_model('stan/1_full.stan')
+path_1 <- 'fits/model1'
+dir.create(path_1, recursive = TRUE, showWarnings = FALSE)
+file_path = file.path(paste0("data/data_list_", modelNr, ".rds"))
+if (!file.exists(file_path)) {
+  saveRDS(data_list, file_path)
+}
+```
+
+
+```{r}
+#| output: false
+
+if (length(list.files(path_1, pattern = "chain")) > 0) { # here
+  fit_1 <- as_cmdstan_fit(list.files(path_1, pattern = "chain", full.names = TRUE)) # here
+} else {
+# Run Stan Model
+  fit_1 <- model_1$sample( # here
+    data = data_list,
+    chains=4,
+    parallel_chains=4,
+    refresh=100,
+    iter_warmup = 1000,
+    iter_sampling = 2000,
+    save_warmup = TRUE,
+    output_dir = path_1, # here
+    output_basename = "chain"
+  )
+}
+
+
+```
+## Mplus
+For use in Mplus, `MplusAutomation` provides a data preparation function:
+```{r}
+path_mplus <- paste0("mplus/model_", modelNr)
+
+if (length(list.files(path_mplus)) > 0) { # here
+  print("already run")
+} else {
+  mplus <- data.frame(id = rep(1:N_subj, each = N_obs),
+                      day = rep(1:N_obs, times = N_subj),
+                      X = as.vector(t(X)),
+                      Y = as.vector(t(Y)))
+  
+  mplus <- mplus[order(mplus$id),]
+  
+  dir.create(path_mplus, showWarnings = FALSE)
+  mplus_txt <- prepareMplusData(mplus, paste0("mplus/model_", modelNr, "/mplus.dat"))
+  
+  # Mplus
+  runModels(paste0(path_mplus, "/model_", modelNr, ".inp"))
+}
+```
+
+
+## Results
+To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
+```{r}
+# Plots - rhat
+rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
+               mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_1) # here
+```
+
+```{r}
+# Plots - rhat
+est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_1) # here
+```
+
+# Model 2 
+## Simulating data
+```{r}
+modelNr = 2
+modelName = "hamaker model 2"
+```
+
+
+```{r}
+#| label: simulate-parameters-2
+mu_phi_X = .2
+mu_phi_Y = .25
+mu_phi_XY = .05
+mu_beta_YX = 0.3
+
+mu_log_psi_X_2 = -1.6
+mu_log_psi_Y_2 = -1.4
+
+mu_X = 3.0
+mu_Y = 1.0
+
+gamma = c(mu_X, mu_Y, mu_phi_X, mu_phi_Y, mu_phi_XY, mu_beta_YX, mu_log_psi_X_2, mu_log_psi_Y_2)
+var_gamma = c(1.8, 0.6, .03, .03, .03, .05, 1, 1)  # variances of parameter
+# Construct the covariance matrix from the variances and a random correlation
+# matrix drawn from a LKJ-distribution. Higher values for eta indicate that
+# high correlations become more unlikely.
+Omega = diag(sqrt(var_gamma)) %*% rlkjcorr(n=1,K=length(gamma),eta=100.0) %*% diag(sqrt(var_gamma))
+# Omega = diag(var_gamma)
+# random individual parameters
+u = mvrnorm(N_subj, rep(0, length(gamma)), Sigma = Omega)
+
+# Prepare array to store the data in an array of dimensions(N_subj, N_obs, p),
+# this can be passed to Stan as a (N_subj, N_obs)-matrix of p-dim. vectors.
+X = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+Y = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+for (i in 1:N_subj) {
+  mu_X = gamma[1] + u[i,1]
+  mu_Y = gamma[2] + u[i,2]
+  
+  phi_X = gamma[3] + u[i,3]
+  phi_Y = gamma[4] + u[i,4]
+  phi_XY = gamma[5] + u[i,5]
+  beta_YX = gamma[6] + u[i,6]
+  
+  psi_X = sqrt(exp(gamma[7] + u[i,7]))
+  psi_Y = sqrt(exp(gamma[8] + u[i,8]))
+  
+  subj_data <- simulate_within(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs)
+  X[i,] = subj_data$X
+  Y[i,] = subj_data$Y
+}
+
+# For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+data_summary_plot(X,Y)
+
+#For use in Stan, we compile all necessary data into a `list`:
+data_list = list(
+  N_obs = N_obs,
+  N_subj = N_subj,
+  X = X,
+  Y = Y,
+  N_mis_X = 0,
+  N_mis_Y = 0,
+  ii_mis_X = c(),
+  ii_mis_Y = c()
+)
+```
+
+Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
+```{r}
+model_2 <- cmdstan_model('stan/2_full.stan')
+path_2 <- 'fits/model2'
+dir.create(path_2, recursive = TRUE, showWarnings = FALSE)
+file_path = file.path(paste0("data/data_list_", modelNr, ".rds"))
+if (!file.exists(file_path)) {
+  saveRDS(data_list, file_path)
+}
+```
+
+
+```{r}
+#| output: false
+
+if (length(list.files(path_2, pattern = "chain")) > 0) { # here
+  fit_2 <- as_cmdstan_fit(list.files(path_2, pattern = "chain", full.names = TRUE)) # here
+} else {
+  # Run Stan Model
+  fit_2 <- model_2$sample( # here
+    data = data_list,
+    chains=4,
+    parallel_chains=4,
+    refresh=100,
+    iter_warmup = 1000,
+    iter_sampling = 2000,
+    save_warmup = TRUE,
+    output_dir = path_2, # here
+    output_basename = "chain"
+  )
+}
+```
+
+## Mplus
+For use in Mplus, `MplusAutomation` provides a data preparation function:
+```{r}
+path_mplus <- paste0("mplus/model_", modelNr)
+
+if (length(list.files(path_mplus)) > 0) { # here
+  print("already run")
+} else {
+  mplus <- data.frame(id = rep(1:N_subj, each = N_obs),
+                      day = rep(1:N_obs, times = N_subj),
+                      X = as.vector(t(X)),
+                      Y = as.vector(t(Y)))
+  
+  mplus <- mplus[order(mplus$id),]
+  
+  dir.create(path_mplus, showWarnings = FALSE)
+  mplus_txt <- prepareMplusData(mplus, paste0("mplus/model_", modelNr, "/mplus.dat"))
+  
+  # Mplus
+  runModels(paste0(path_mplus, "/model_", modelNr, ".inp"))
+}
+```
+
+
+## Results
+To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
+```{r}
+# Plots - rhat
+rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
+               mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_2) # here
+```
+
+```{r}
+# Plots - rhat
+est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_2) # here
+```
+
+
+
+# Model 3 
+## Simulating data
+```{r}
+modelNr = 3
+modelName = "hamaker model 3"
+set.seed(1)
+```
+
+
+```{r}
+#| label: simulate-parameters-3
+mu_phi_X = .2
+mu_phi_Y = .25
+mu_phi_XY = .05
+mu_beta_YX = 0.3
+
+mu_log_psi_X_2 = -1.6
+mu_log_psi_Y_2 = -1.4
+
+mu_X = 3.0
+mu_Y = 1.0
+
+gamma = c(mu_X, mu_Y, mu_phi_X, mu_phi_Y, mu_phi_XY, mu_beta_YX, mu_log_psi_X_2, mu_log_psi_Y_2)
+var_gamma = c(1.8, 0.6, .03, .03, .03, .05, 1, 1) / 1.8  # variances of parameter
+# Construct the covariance matrix from the variances and a random correlation
+# matrix drawn from a LKJ-distribution. Higher values for eta indicate that
+# high correlations become more unlikely.
+Omega = diag(var_gamma)
+# Omega = diag(var_gamma)
+# random individual parameters
+u = mvrnorm(N_subj, rep(0, length(gamma)), Sigma = Omega)
+
+a = c(1, 0.6, .05, .05, .05, .05, .4, .4)
+
+P = rnorm(N_subj, 0, 1)
+
+# Prepare array to store the data in an array of dimensions(N_subj, N_obs, p),
+# this can be passed to Stan as a (N_subj, N_obs)-matrix of p-dim. vectors.
+X = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+Y = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+for (i in 1:N_subj) {
+  mu_X = gamma[1] + a[1] * P[i] + u[i,1]
+  mu_Y = gamma[2] + a[2] * P[i] + u[i,2]
+  
+  phi_X = gamma[3] + a[3] * P[i] + u[i,3]
+  phi_Y = gamma[4] + a[4] * P[i] + u[i,4]
+  phi_XY = gamma[5] + a[5] * P[i] + u[i,5]
+  beta_YX = gamma[6] + a[6] * P[i] + u[i,6]
+  
+  psi_X = sqrt(exp(gamma[7] + a[7] * P[i] + u[i,7]))
+  psi_Y = sqrt(exp(gamma[8] + a[8] * P[i] + u[i,8]))
+
+  data_within <- simulate_within(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs)
+  X[i,] = data_within$X
+  Y[i,] = data_within$Y
+}
+# For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+data_summary_plot(X,Y)
+
+#For use in Stan, we compile all necessary data into a `list`:
+data_list = list(
+  N_obs = N_obs,
+  N_subj = N_subj,
+  X = X,
+  Y = Y,
+  P = P,
+  N_mis_X = 0,
+  N_mis_Y = 0,
+  ii_mis_X = c(),
+  ii_mis_Y = c()
+)
+```
+
+Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
+```{r}
+model_3 <- cmdstan_model('stan/3_full.stan')
+path_3 <- 'fits/model3'
+dir.create(path_3, recursive = TRUE, showWarnings = FALSE)
+file_path = file.path(paste0("data/data_list_", modelNr, ".rds"))
+if (!file.exists(file_path)) {
+  saveRDS(data_list, file_path)
+}
+```
+
+
+```{r}
+#| output: false
+
+if (length(list.files(path_3, pattern = "chain")) > 0) { # here
+  fit_3 <- as_cmdstan_fit(list.files(path_3, pattern = "chain", full.names = TRUE)) # here
+} else {
+  # Run Stan Model
+  fit_3 <- model_3$sample( # here
+    data = data_list,
+    chains=4,
+    parallel_chains=4,
+    refresh=100,
+    iter_warmup = 1000,
+    iter_sampling = 2000,
+    save_warmup = TRUE,
+    output_dir = path_3, # here
+    output_basename = "chain"
+  )
+}
+```
+
+## Mplus
+For use in Mplus, `MplusAutomation` provides a data preparation function:
+```{r}
+path_mplus <- paste0("mplus/model_", modelNr)
+
+if (length(list.files(path_mplus)) > 0) { # here
+  print("already run")
+} else {
+  mplus <- data.frame(id = rep(1:N_subj, each = N_obs),
+                      day = rep(1:N_obs, times = N_subj),
+                      X = as.vector(t(X)),
+                      Y = as.vector(t(Y)),
+                      P = as.vector(rep(t(P), each = N_obs)))
+  
+  mplus <- mplus[order(mplus$id),]
+  
+  dir.create(path_mplus, showWarnings = FALSE)
+  mplus_txt <- prepareMplusData(mplus, paste0("mplus/model_", modelNr, "/mplus.dat"))
+  
+  # Mplus
+  runModels(paste0(path_mplus, "/model_", modelNr, ".inp"))
+}
+```
+
+
+## Results
+To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
+```{r}
+# Plots - rhat
+rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
+               mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_3) # here
+```
+
+```{r}
+# Plots - rhat
+est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_3) # here
+```
+
+
+
+# Model 4 
+## Simulating data
+```{r}
+modelNr = 4
+modelName = "hamaker model 4"
+```
+
+
+```{r}
+#| label: simulate-parameters-4
+mu_phi_X = .2
+mu_phi_Y = .25
+mu_phi_XY = .05
+mu_beta_YX = 0.3
+
+mu_log_psi_X_2 = -1.6
+mu_log_psi_Y_2 = -1.4
+
+mu_X = 3.0
+mu_Y = 1.0
+
+gamma = c(mu_X, mu_Y, mu_phi_X, mu_phi_Y, mu_phi_XY, mu_beta_YX, mu_log_psi_X_2, mu_log_psi_Y_2)
+var_gamma = c(1.8, 0.6, .03, .03, .03, .05, 1, 1) / 5  # variances of parameter
+# Construct the covariance matrix from the variances and a random correlation
+# matrix drawn from a LKJ-distribution. Higher values for eta indicate that
+# high correlations become more unlikely.
+Omega = diag(var_gamma)
+# Omega = diag(var_gamma)
+# random individual parameters
+u = mvrnorm(N_subj, rep(0, length(gamma)), Sigma = Omega)
+
+f = c(1, 0.6, .05, .05, .05, .05, .4, .4)
+
+C = rnorm(N_subj, 0, 1)
+
+# Prepare array to store the data in an array of dimensions(N_subj, N_obs, p),
+# this can be passed to Stan as a (N_subj, N_obs)-matrix of p-dim. vectors.
+X = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+Y = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+for (i in 1:N_subj) {
+  mu_X = gamma[1] + f[1] * C[i] + u[i,1]
+  mu_Y = gamma[2] + f[2] * C[i] + u[i,2]
+  
+  phi_X = gamma[3] + f[3] * C[i] + u[i,3]
+  phi_Y = gamma[4] + f[4] * C[i] + u[i,4]
+  phi_XY = gamma[5] + f[5] * C[i] + u[i,5]
+  beta_YX = gamma[6] + f[6] * C[i] + u[i,6]
+  
+  psi_X = sqrt(exp(gamma[7] + f[7] * C[i] + u[i,7]))
+  psi_Y = sqrt(exp(gamma[8] + f[8] * C[i] + u[i,8]))
+
+  data_within <- simulate_within(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs)
+  X[i,] = data_within$X
+  Y[i,] = data_within$Y
+}
+# For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+data_summary_plot(X,Y)
+
+#For use in Stan, we compile all necessary data into a `list`:
+data_list = list(
+  N_obs = N_obs,
+  N_subj = N_subj,
+  X = X,
+  Y = Y,
+  N_mis_X = 0,
+  N_mis_Y = 0,
+  ii_mis_X = c(),
+  ii_mis_Y = c()
+)
+```
+
+Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
+```{r}
+model_4 <- cmdstan_model('stan/4_full.stan')
+path_4 <- 'fits/model4'
+dir.create(path_4, recursive = TRUE, showWarnings = FALSE)
+file_path = file.path(paste0("data/data_list_", modelNr, ".rds"))
+if (!file.exists(file_path)) {
+  saveRDS(data_list, file_path)
+}
+```
+
+
+```{r}
+#| output: false
+
+if (length(list.files(path_4, pattern = "chain")) > 0) { # here
+  fit_4 <- as_cmdstan_fit(list.files(path_4, pattern = "chain", full.names = TRUE)) # here
+} else {
+  # Run Stan Model
+  fit_4 <- model_4$sample( # here
+    data = data_list,
+    chains=4,
+    parallel_chains=4,
+    refresh=100,
+    iter_warmup = 1000,
+    iter_sampling = 2000,
+    save_warmup = TRUE,
+    output_dir = path_4, # here
+    output_basename = "chain"
+  )
+}
+```
+
+## Mplus
+For use in Mplus, `MplusAutomation` provides a data preparation function:
+```{r}
+path_mplus <- paste0("mplus/model_", modelNr)
+
+if (length(list.files(path_mplus)) > 0) { # here
+  print("already run")
+} else {
+  mplus <- data.frame(id = rep(1:N_subj, each = N_obs),
+                      day = rep(1:N_obs, times = N_subj),
+                      X = as.vector(t(X)),
+                      Y = as.vector(t(Y)))
+  
+  mplus <- mplus[order(mplus$id),]
+  
+  dir.create(path_mplus, showWarnings = FALSE)
+  mplus_txt <- prepareMplusData(mplus, paste0("mplus/model_", modelNr, "/mplus.dat"))
+  
+  # Mplus
+  runModels(paste0(path_mplus, "/model_", modelNr, ".inp"))
+}
+```
+
+
+## Results
+To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
+```{r}
+# Plots - rhat
+rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
+               mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_4) # here
+```
+
+```{r}
+# Plots - rhat
+est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_4) # here
+```
+
+
+
+# Model 5 
+## Simulating data
+```{r}
+modelNr = 5
+modelName = "hamaker model 5"
+```
+
+
+```{r}
+#| label: simulate-parameters-5
+mu_phi_X = .2
+mu_phi_Y = .25
+mu_phi_XY = .05
+mu_beta_YX = 0.3
+
+mu_log_psi_X_2 = -1.6
+mu_log_psi_Y_2 = -1.4
+
+mu_X = 3.0
+mu_Y = 1.0
+
+gamma = c(mu_X, mu_Y, mu_phi_X, mu_phi_Y, mu_phi_XY, mu_beta_YX, mu_log_psi_X_2, mu_log_psi_Y_2)
+var_gamma = c(1.8, 0.6, .03, .03, .03, .05, 1, 1)  # variances of parameter
+# Construct the covariance matrix from the variances and a random correlation
+# matrix drawn from a LKJ-distribution. Higher values for eta indicate that
+# high correlations become more unlikely.
+Omega = diag(var_gamma)
+# Omega = diag(var_gamma)
+# random individual parameters
+u = mvrnorm(N_subj, rep(0, length(gamma)), Sigma = Omega)
+
+f = c(1, 0.6, .05, .05, .05, .05, .4, .4)
+tau = rnorm(10, 0, 1)
+
+sigma_P <- 1
+sigma_O <- 1
+P = rnorm(N_subj, 0, sigma_P)
+O = rnorm(N_subj, 0, sigma_O)
+
+# Prepare array to store the data in an array of dimensions(N_subj, N_obs, p),
+# this can be passed to Stan as a (N_subj, N_obs)-matrix of p-dim. vectors.
+X = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+Y = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+for (i in 1:N_subj) {
+  mu_X = gamma[1] + f[1] * P[i] + u[i,1]
+  mu_Y = gamma[2] + f[2] * P[i] + u[i,2]
+  
+  phi_X = gamma[3] + f[3] * P[i] + u[i,3]
+  phi_Y = gamma[4] + f[4] * P[i] + u[i,4]
+  phi_XY = gamma[5] + f[5] * P[i] + u[i,5]
+  beta_YX = gamma[6] + f[6] * P[i] + u[i,6]
+  
+  psi_X = sqrt(exp(gamma[7] + f[7] * P[i] + u[i,7]))
+  psi_Y = sqrt(exp(gamma[8] + f[8] * P[i] + u[i,8]))
+  
+  O[i] <- O[i] + tau[1] + tau[2] * P[i] + tau[3] * mu_X + tau[4] * mu_Y +
+      tau[5] * phi_X + tau[6] * phi_Y + tau[7] * phi_XY +
+      tau[8] * beta_YX + tau[9] * log(psi_X^2) + tau[10] * log(psi_Y^2)
+
+  data_within <- simulate_within(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs)
+  X[i,] = data_within$X
+  Y[i,] = data_within$Y
+}
+# For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+data_summary_plot(X,Y)
+
+#For use in Stan, we compile all necessary data into a `list`:
+data_list = list(
+  N_obs = N_obs,
+  N_subj = N_subj,
+  X = X,
+  Y = Y,
+  P = P,
+  O = O,
+  N_mis_X = 0,
+  N_mis_Y = 0,
+  ii_mis_X = c(),
+  ii_mis_Y = c()
+)
+```
+
+Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
+```{r}
+model_5 <- cmdstan_model('stan/5_full.stan')
+path_5 <- 'fits/model5'
+dir.create(path_5, recursive = TRUE, showWarnings = FALSE)
+file_path = file.path(paste0("data/data_list_", modelNr, ".rds"))
+if (!file.exists(file_path)) {
+  saveRDS(data_list, file_path)
+}
+```
+
+
+```{r}
+#| output: false
+
+if (length(list.files(path_5, pattern = "chain")) > 0) { # here
+  fit_5 <- as_cmdstan_fit(list.files(path_5, pattern = "chain", full.names = TRUE)) # here
+} else {
+  # Run Stan Model
+  fit_5 <- model_5$sample( # here
+    data = data_list,
+    chains=4,
+    parallel_chains=4,
+    refresh=100,
+    iter_warmup = 1000,
+    iter_sampling = 2000,
+    save_warmup = TRUE,
+    output_dir = path_5, # here
+    output_basename = "chain"
+  )
+}
+```
+
+## Mplus
+For use in Mplus, `MplusAutomation` provides a data preparation function:
+```{r}
+path_mplus <- paste0("mplus/model_", modelNr)
+
+if (length(list.files(path_mplus)) > 0) { # here
+  print("already run")
+} else {
+  mplus <- data.frame(id = rep(1:N_subj, each = N_obs),
+                      day = rep(1:N_obs, times = N_subj),
+                      X = as.vector(t(X)),
+                      Y = as.vector(t(Y)),
+                      P = as.vector(rep(t(P), each = N_obs)),
+                      O = as.vector(rep(t(O), each = N_obs)))
+  
+  mplus <- mplus[order(mplus$id),]
+  
+  dir.create(path_mplus, showWarnings = FALSE)
+  mplus_txt <- prepareMplusData(mplus, paste0("mplus/model_", modelNr, "/mplus.dat"))
+  
+  # Mplus
+  runModels(paste0(path_mplus, "/model_", modelNr, ".inp"))
+}
+```
+
+
+## Results
+To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
+```{r}
+# Plots - rhat
+rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
+               mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_5) # here
+```
+
+```{r}
+# Plots - rhat
+est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_5) # here
+```
+
+
+
+# Model 6 
+## Simulating data
+```{r}
+modelNr = 6
+modelName = "hamaker model 6"
+```
+
+
+```{r}
+#| label: simulate-parameters-6
+mu_phi_X = .2
+mu_phi_Y = .25
+mu_phi_XY = .05
+mu_beta_YX = 0.3
+
+mu_log_psi_X_2 = -1.6
+mu_log_psi_Y_2 = -1.4
+
+mu_X = 3.0
+mu_Y = 1.0
+
+gamma = c(mu_X, mu_Y, mu_phi_X, mu_phi_Y, mu_phi_XY, mu_beta_YX, mu_log_psi_X_2, mu_log_psi_Y_2)
+var_gamma = c(1.8, 0.6, .03, .03, .03, .05, 1, 1) / 5  # variances of parameter
+# Construct the covariance matrix from the variances and a random correlation
+# matrix drawn from a LKJ-distribution. Higher values for eta indicate that
+# high correlations become more unlikely.
+Omega = diag(var_gamma)
+# Omega = diag(var_gamma)
+# random individual parameters
+u = mvrnorm(N_subj, rep(0, length(gamma)), Sigma = Omega)
+
+f = c(1, 0.6, .05, .05, .05, .05, .4, .4)
+tau <- rnorm(4, 0, 1)
+
+P = rnorm(N_subj, 0, 1)
+O = rnorm(N_subj, 0, .1)
+C = rnorm(N_subj, 0, 1)
+
+# Prepare array to store the data in an array of dimensions(N_subj, N_obs, p),
+# this can be passed to Stan as a (N_subj, N_obs)-matrix of p-dim. vectors.
+X = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+Y = array(rep(0, N_subj * N_obs), c(N_subj, N_obs))
+for (i in 1:N_subj) {
+  C[i] = C[i] + tau[4] * P[i]
+  mu_X = gamma[1] + f[1] * C[i] + u[i,1]
+  mu_Y = gamma[2] + f[2] * C[i] + u[i,2]
+  
+  phi_X = gamma[3] + f[3] * C[i] + u[i,3]
+  phi_Y = gamma[4] + f[4] * C[i] + u[i,4]
+  phi_XY = gamma[5] + f[5] * C[i] + u[i,5]
+  beta_YX = gamma[6] + f[6] * C[i] + u[i,6]
+  
+  psi_X = sqrt(exp(gamma[7] + f[7] * C[i] + u[i,7]))
+  psi_Y = sqrt(exp(gamma[8] + f[8] * C[i] + u[i,8]))
+
+  data_within <- simulate_within(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs)
+  X[i,] = data_within$X
+  Y[i,] = data_within$Y
+  O[i] = O[i] + tau[1] + tau[2] * P[i] + tau[3] * C[i]
+}
+# For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+data_summary_plot(X,Y)
+
+#For use in Stan, we compile all necessary data into a `list`:
+data_list = list(
+  N_obs = N_obs,
+  N_subj = N_subj,
+  X = X,
+  Y = Y,
+  P = P,
+  O = O,
+  N_mis_X = 0,
+  N_mis_Y = 0,
+  ii_mis_X = c(),
+  ii_mis_Y = c()
+)
+```
+
+Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
+```{r}
+model_6 <- cmdstan_model('stan/6_full.stan')
+path_6 <- 'fits/model6'
+dir.create(path_6, recursive = TRUE, showWarnings = FALSE)
+file_path = file.path(paste0("data/data_list_", modelNr, ".rds"))
+if (!file.exists(file_path)) {
+  saveRDS(data_list, file_path)
+}
+```
+
+
+```{r}
+#| output: false
+
+if (length(list.files(path_6, pattern = "chain")) > 0) { # here
+  fit_6 <- as_cmdstan_fit(list.files(path_6, pattern = "chain", full.names = TRUE)) # here
+} else {
+  # Run Stan Model
+  fit_6 <- model_6$sample( # here
+    data = data_list,
+    chains=4,
+    parallel_chains=4,
+    refresh=100,
+    iter_warmup = 1000,
+    iter_sampling = 3000,
+    save_warmup = TRUE,
+    output_dir = path_6, # here
+    output_basename = "chain"
+  )
+}
+```
+
+## Mplus
+For use in Mplus, `MplusAutomation` provides a data preparation function:
+```{r}
+path_mplus <- paste0("mplus/model_", modelNr)
+
+if (length(list.files(path_mplus)) > 0) { # here
+  print("already run")
+} else {
+  mplus <- data.frame(id = rep(1:N_subj, each = N_obs),
+                      day = rep(1:N_obs, times = N_subj),
+                      X = as.vector(t(X)),
+                      Y = as.vector(t(Y)),
+                      P = as.vector(rep(t(P), each = N_obs)),
+                      O = as.vector(rep(t(O), each = N_obs)))
+  
+  mplus <- mplus[order(mplus$id),]
+  
+  dir.create(path_mplus, showWarnings = FALSE)
+  mplus_txt <- prepareMplusData(mplus, paste0("mplus/model_", modelNr, "/mplus.dat"))
+  
+  # Mplus
+  runModels(paste0(path_mplus, "/model_", modelNr, ".inp"))
+}
+```
+
+
+## Results
+To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
+```{r}
+# Plots - rhat
+rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
+               mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_6) # here
+```
+
+```{r}
+# Plots - rhat
+est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
+               fit = fit_6) # here
+```
+

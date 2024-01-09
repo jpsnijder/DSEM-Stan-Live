@@ -5,8 +5,10 @@ data {
   array[N_subj,N_obs] real Y; 
   // missing data: indicate number and indices, each vector contains
   // a position as (subject, observation)
-  int<lower=0,upper=N_subj*N_obs> N_mis;
-  array[N_mis,2] int ii_mis;
+  int<lower=0,upper=N_subj*N_obs> N_mis_X; //changed
+  int<lower=0,upper=N_subj*N_obs> N_mis_Y; //changed
+  array[N_mis_X,2] int ii_mis_X; //changed
+  array[N_mis_Y,2] int ii_mis_Y; //changed
 }
 parameters {
   // between-level
@@ -16,8 +18,8 @@ parameters {
   cholesky_factor_corr[8] L_Omega; // cholesky factor
   vector<lower=0>[8] tau_Omega;
   // parameters for modeling missing data
-  array[N_mis] real X_mis;
-  array[N_mis] real Y_mis;
+  array[N_mis_X] real X_mis;
+  array[N_mis_Y] real Y_mis;
 }
 transformed parameters {
   // construct covariance matrices from cholesky factors and standard deviations
@@ -30,24 +32,30 @@ transformed parameters {
   }
 }
 model {
+  
   // impute missing values into the matrix
   array[N_subj,N_obs] real X_imp = X; 
   array[N_subj,N_obs] real Y_imp = Y; 
-  if (N_mis > 0) {
-    for (k in 1:N_mis) {
-      X_imp[ii_mis[k][1], ii_mis[k][2]] = X_mis[k]; 
-      Y_imp[ii_mis[k][1], ii_mis[k][2]] = Y_mis[k]; 
+  if (N_mis_X > 0) {
+    for (k in 1:N_mis_X) {
+      X_imp[ii_mis_X[k][1], ii_mis_X[k][2]] = X_mis[k]; 
+    }
+  }
+  
+    if (N_mis_Y > 0) {
+    for (k in 1:N_mis_Y) {
+      Y_imp[ii_mis_Y[k][1], ii_mis_Y[k][2]] = Y_mis[k]; 
     }
   }
 
   // priors (between-level)
   gamma ~ normal(0, 1e6);
   L_Omega ~ lkj_corr_cholesky(1.0);  // R_Omega ~ lkj_corr(1.0)
-  tau_Omega ~ cauchy(0, 10); # to 10/100 was 2.5
+  tau_Omega ~ cauchy(0, 10); // to 10/100 was 2.5
 
   // priors (imputed data points)
-  X_mis ~ normal(15, 10); # reflect data better, mean plus 10, was 0,10
-  Y_mis ~ normal(7, 10); # reflect data better
+  X_mis ~ normal(15, 10); // reflect data better, mean plus 10, was 0,10
+  Y_mis ~ normal(7, 10); // reflect data better
 
   // likelihood
   for (i in 1:N_subj) {

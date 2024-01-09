@@ -1,0 +1,38 @@
+TITLE: Model 4
+DATA: FILE = "mplus.dat";
+
+VARIABLE:
+    NAMES = id day X Y;  ! variables names (in the order they appear in the data file) 
+    USEVARIABLES = X Y;      ! which variables to include in the analysis
+    CLUSTER = id;            ! which variable indicates the clustering of the data
+    LAGGED = X(1) Y(1);      ! create lagged versions of X and Y (lag 1)
+    TINTERVAL = day(1);      ! which variable indicates the timing of observations
+    MISSING=.;
+    
+SAVEDATA:
+    BPARAMETER = draws.dat;
+
+ANALYSIS:   TYPE = TWOLEVEL RANDOM;
+              ESTIMATOR = BAYES;
+              PROC=4;
+              CHAINS=4;
+              BITER = (3000);  ! run at least 5000 iterations (more if needed according to PSR)
+              !BSEED = 020;
+              THIN = 5;        
+
+MODEL:
+  %WITHIN%
+    phi_X   | X ON X&1; ! autoregression X (lag 1)
+    phi_Y   | Y ON Y&1; ! autoregression Y (lag 1)
+    phi_XY  | Y on X&1; ! cross-lagged regression from X to Y (lag 1)
+    beta_YX | X ON Y;   ! cross-regression from Y to X (lag 0)
+    psi_X   | X;        ! random residual variance X
+    psi_Y   | Y;        ! random residual variance Y
+
+
+  %BETWEEN%
+    ! Specify a common factor for the random effects
+    c BY X@1 Y phi_X-psi_Y*.1;
+
+OUTPUT: TECH1 TECH8 STDYX FSCOMPARISON STAND(CLUSTER);
+  

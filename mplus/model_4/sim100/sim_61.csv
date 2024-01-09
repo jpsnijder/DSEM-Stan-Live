@@ -1,0 +1,9 @@
+"paramHeader","param","est","posterior_sd","pval","lower_2.5ci","upper_2.5ci","sig","BetweenWithin","mplus_time","rhatMean","rhatLast"
+"Intercepts","X",3.003,0.106,0,2.797,3.218,TRUE,"Between",2,1.00062618023919,1.00062618023919
+"Intercepts","Y",1.061,0.071,0,0.919,1.198,TRUE,"Between",2,1.00062618023919,1.00062618023919
+"Intercepts","PHI_X",0.182,0.019,0,0.145,0.218,TRUE,"Between",2,1.00062618023919,1.00062618023919
+"Intercepts","PHI_Y",0.206,0.017,0,0.173,0.241,TRUE,"Between",2,1.00062618023919,1.00062618023919
+"Intercepts","PHI_XY",0.081,0.021,0,0.04,0.121,TRUE,"Between",2,1.00062618023919,1.00062618023919
+"Intercepts","BETA_YX",0.309,0.015,0,0.28,0.34,TRUE,"Between",2,1.00062618023919,1.00062618023919
+"Intercepts","PSI_X",-1.621,0.062,0,-1.745,-1.501,TRUE,"Between",2,1.00062618023919,1.00062618023919
+"Intercepts","PSI_Y",-1.353,0.066,0,-1.484,-1.22,TRUE,"Between",2,1.00062618023919,1.00062618023919

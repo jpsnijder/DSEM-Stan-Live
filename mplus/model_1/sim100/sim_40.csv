@@ -1,0 +1,3 @@
+"paramHeader","param","est","posterior_sd","pval","lower_2.5ci","upper_2.5ci","sig","BetweenWithin","mplus_time","rhatMean","rhatLast"
+"Means","X",2.92,0.14,0,2.635,3.189,TRUE,"Between",0,1.00021818029037,1.00021818029037
+"Means","Y",1.041,0.086,0,0.869,1.208,TRUE,"Between",0,1.00021818029037,1.00021818029037

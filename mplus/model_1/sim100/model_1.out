@@ -1,0 +1,536 @@
+Mplus VERSION 8.10
+MUTHEN & MUTHEN
+12/30/2023  11:44 AM
+
+INPUT INSTRUCTIONS
+
+  TITLE: Hamaker Model 1
+  DATA: FILE = "mplus.dat";
+
+  VARIABLE:
+      NAMES = id day X Y;  ! variables names (in the order they appear in the data file)
+      USEVARIABLES = X Y;      ! which variables to include in the analysis
+      CLUSTER = id;            ! which variable indicates the clustering of the data
+      LAGGED = X(1) Y(1);      ! create lagged versions of X and Y (lag 1)
+      TINTERVAL = day(1);      ! which variable indicates the timing of observations
+      MISSING=.;
+
+  SAVEDATA:
+      BPARAMETER = draws.dat;
+
+  ANALYSIS:   TYPE = TWOLEVEL;
+                ESTIMATOR = BAYES;
+                PROC=4;
+                CHAINS=4;
+                BITER = (2000);  ! run at least 5000 iterations (more if needed according to
+                !BSEED = 020; !removed seed for random sim purposes
+                THIN = 5;
+
+  MODEL:
+    %WITHIN%
+    X ON X&1; ! autoregression X (lag 1)
+    Y ON Y&1; ! autoregression Y (lag 1)
+    Y on X&1; ! cross-lagged regression from X to Y (lag 1)
+    X ON Y;   ! cross-regression from Y to X (lag 0)
+
+    %BETWEEN%
+      ! allow all random effects to be correlated
+      X WITH Y;
+
+    OUTPUT: TECH1 TECH8 STDYX FSCOMPARISON;
+
+
+
+*** WARNING in OUTPUT command
+  FSCOMPARISON is only available with TYPE=TWOLEVEL with ESTIMATOR=BAYES when
+  factor scores are requested in the SAVEDATA or PLOT command.
+  Request for FSCOMPARISON is ignored.
+   1 WARNING(S) FOUND IN THE INPUT INSTRUCTIONS
+
+
+
+Hamaker Model 1
+
+SUMMARY OF ANALYSIS
+
+Number of groups                                                 1
+Number of observations                                        5000
+
+Number of dependent variables                                    2
+Number of independent variables                                  2
+Number of continuous latent variables                            0
+
+Observed dependent variables
+
+  Continuous
+   X           Y
+
+Observed independent variables
+   X&1         Y&1
+
+Variables with special functions
+
+  Cluster variable      ID
+
+  Within variables
+   X&1         Y&1
+
+
+Estimator                                                    BAYES
+Specifications for Bayesian Estimation
+  Point estimate                                            MEDIAN
+  Number of Markov chain Monte Carlo (MCMC) chains               4
+  Random seed for the first chain                                0
+  Starting value information                           UNPERTURBED
+  Algorithm used for Markov chain Monte Carlo           GIBBS(PX1)
+  Convergence criterion                                  0.500D-01
+  Maximum number of iterations                               50000
+  K-th iteration used for thinning                               5
+
+Input data file(s)
+  mplus.dat
+Input data format  FREE
+
+
+SUMMARY OF DATA
+
+     Number of clusters                        100
+
+       Size (s)    Cluster ID with Size s
+
+         50        1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21
+                   22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
+                   40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57
+                   58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75
+                   76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93
+                   94 95 96 97 98 99 100
+
+
+
+COVARIANCE COVERAGE OF DATA
+
+Minimum covariance coverage value   0.100
+
+     Number of missing data patterns             2
+
+
+     PROPORTION OF DATA PRESENT
+
+
+           Covariance Coverage
+              X             Y
+              ________      ________
+ X              1.000
+ Y              1.000         1.000
+
+
+
+UNIVARIATE SAMPLE STATISTICS
+
+
+     UNIVARIATE HIGHER-ORDER MOMENT DESCRIPTIVE STATISTICS
+
+         Variable/         Mean/     Skewness/   Minimum/ % with                Percentiles
+        Sample Size      Variance    Kurtosis    Maximum  Min/Max      20%/60%    40%/80%    Median
+
+     X                     3.160       0.929       0.247    0.02%       2.159      2.788      3.065
+            5000.000       1.675       3.158       9.660    0.02%       3.336      4.172
+     Y                     1.069       0.000      -1.735    0.02%       0.400      0.838      1.046
+            5000.000       0.662       0.017       3.456    0.02%       1.263      1.756
+
+
+THE MODEL ESTIMATION TERMINATED NORMALLY
+
+     USE THE FBITERATIONS OPTION TO INCREASE THE NUMBER OF ITERATIONS BY A FACTOR
+     OF AT LEAST TWO TO CHECK CONVERGENCE AND THAT THE PSR VALUE DOES NOT INCREASE.
+
+
+
+MODEL FIT INFORMATION
+
+Number of Free Parameters                              11
+
+Information Criteria
+
+          Deviance (DIC)                        -1409.766
+          Estimated Number of Parameters (pD)     218.190
+
+
+
+MODEL RESULTS
+
+                                Posterior  One-Tailed         95% C.I.
+                    Estimate       S.D.      P-Value   Lower 2.5%  Upper 2.5%  Significance
+
+Within Level
+
+ X          ON
+    X&1                0.211       0.014      0.000       0.185       0.238      *
+    Y                  0.312       0.011      0.000       0.291       0.334      *
+
+ Y          ON
+    Y&1                0.255       0.015      0.000       0.224       0.284      *
+    X&1                0.064       0.017      0.000       0.030       0.097      *
+
+ Residual Variances
+    X                  0.040       0.001      0.000       0.038       0.041      *
+    Y                  0.062       0.001      0.000       0.060       0.065      *
+
+Between Level
+
+ X        WITH
+    Y                  0.038       0.110      0.358      -0.172       0.266
+
+ Means
+    X                  3.161       0.132      0.000       2.891       3.415      *
+    Y                  1.069       0.081      0.000       0.908       1.225      *
+
+ Variances
+    X                  1.719       0.266      0.000       1.317       2.333      *
+    Y                  0.630       0.097      0.000       0.475       0.857      *
+
+
+STANDARDIZED MODEL RESULTS
+
+
+STDYX Standardization
+
+                                Posterior  One-Tailed         95% C.I.
+                    Estimate       S.D.      P-Value   Lower 2.5%  Upper 2.5%  Significance
+Within Level
+
+ X          ON
+    X&1                0.211       0.014      0.000       0.185       0.238      *
+    Y                  0.365       0.012      0.000       0.341       0.388      *
+
+ Y          ON
+    Y&1                0.255       0.015      0.000       0.224       0.284      *
+    X&1                0.055       0.015      0.000       0.026       0.084      *
+
+ Residual Variances
+    X                  0.798       0.011      0.000       0.776       0.820      *
+    Y                  0.921       0.008      0.000       0.904       0.936      *
+
+Between Level
+
+ X        WITH
+    Y                  0.037       0.102      0.358      -0.163       0.244
+
+ Means
+    X                  2.409       0.203      0.000       2.019       2.806      *
+    Y                  1.347       0.143      0.000       1.071       1.639      *
+
+ Variances
+    X                  1.000       0.000      0.000       1.000       1.000
+    Y                  1.000       0.000      0.000       1.000       1.000
+
+
+R-SQUARE
+
+Within Level
+
+                                Posterior  One-Tailed         95% C.I.
+    Variable        Estimate       S.D.      P-Value   Lower 2.5%  Upper 2.5%
+
+    X                  0.202       0.011      0.000       0.180       0.224
+    Y                  0.079       0.008      0.000       0.064       0.096
+
+
+TECHNICAL 1 OUTPUT
+
+
+     PARAMETER SPECIFICATION FOR WITHIN
+
+
+           NU
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+                    0             0             0             0
+
+
+           LAMBDA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X                  0             0             0             0
+ Y                  0             0             0             0
+ X&1                0             0             0             0
+ Y&1                0             0             0             0
+
+
+           THETA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X                  0
+ Y                  0             0
+ X&1                0             0             0
+ Y&1                0             0             0             0
+
+
+           ALPHA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+                    0             0             0             0
+
+
+           BETA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X                  0             1             2             0
+ Y                  0             0             3             4
+ X&1                0             0             0             0
+ Y&1                0             0             0             0
+
+
+           PSI
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X                  5
+ Y                  0             6
+ X&1                0             0             0
+ Y&1                0             0             0             0
+
+
+     PARAMETER SPECIFICATION FOR BETWEEN
+
+
+           NU
+              X             Y
+              ________      ________
+                    0             0
+
+
+           LAMBDA
+              X             Y
+              ________      ________
+ X                  0             0
+ Y                  0             0
+
+
+           THETA
+              X             Y
+              ________      ________
+ X                  0
+ Y                  0             0
+
+
+           ALPHA
+              X             Y
+              ________      ________
+                    7             8
+
+
+           BETA
+              X             Y
+              ________      ________
+ X                  0             0
+ Y                  0             0
+
+
+           PSI
+              X             Y
+              ________      ________
+ X                  9
+ Y                 10            11
+
+
+     STARTING VALUES FOR WITHIN
+
+
+           NU
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+                0.000         0.000         0.000         0.000
+
+
+           LAMBDA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X              1.000         0.000         0.000         0.000
+ Y              0.000         1.000         0.000         0.000
+ X&1            0.000         0.000         1.000         0.000
+ Y&1            0.000         0.000         0.000         1.000
+
+
+           THETA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X              0.000
+ Y              0.000         0.000
+ X&1            0.000         0.000         0.000
+ Y&1            0.000         0.000         0.000         0.000
+
+
+           ALPHA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+                0.000         0.000         0.000         0.000
+
+
+           BETA
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X              0.000         0.000         0.000         0.000
+ Y              0.000         0.000         0.000         0.000
+ X&1            0.000         0.000         0.000         0.000
+ Y&1            0.000         0.000         0.000         0.000
+
+
+           PSI
+              X             Y             X&1           Y&1
+              ________      ________      ________      ________
+ X              0.838
+ Y              0.000         0.331
+ X&1            0.000         0.000         0.839
+ Y&1            0.000         0.000         0.000         0.331
+
+
+     STARTING VALUES FOR BETWEEN
+
+
+           NU
+              X             Y
+              ________      ________
+                0.000         0.000
+
+
+           LAMBDA
+              X             Y
+              ________      ________
+ X              1.000         0.000
+ Y              0.000         1.000
+
+
+           THETA
+              X             Y
+              ________      ________
+ X              0.000
+ Y              0.000         0.000
+
+
+           ALPHA
+              X             Y
+              ________      ________
+                3.160         1.069
+
+
+           BETA
+              X             Y
+              ________      ________
+ X              0.000         0.000
+ Y              0.000         0.000
+
+
+           PSI
+              X             Y
+              ________      ________
+ X              0.838
+ Y              0.000         0.331
+
+
+
+     PRIORS FOR ALL PARAMETERS            PRIOR MEAN      PRIOR VARIANCE     PRIOR STD. DEV.
+
+     Parameter 1~N(0.000,infinity)           0.0000            infinity            infinity
+     Parameter 2~N(0.000,infinity)           0.0000            infinity            infinity
+     Parameter 3~N(0.000,infinity)           0.0000            infinity            infinity
+     Parameter 4~N(0.000,infinity)           0.0000            infinity            infinity
+     Parameter 5~IG(-1.000,0.000)          infinity            infinity            infinity
+     Parameter 6~IG(-1.000,0.000)          infinity            infinity            infinity
+     Parameter 7~N(0.000,infinity)           0.0000            infinity            infinity
+     Parameter 8~N(0.000,infinity)           0.0000            infinity            infinity
+     Parameter 9~IW(0.000,-3)              infinity            infinity            infinity
+     Parameter 10~IW(0.000,-3)             infinity            infinity            infinity
+     Parameter 11~IW(0.000,-3)             infinity            infinity            infinity
+
+
+TECHNICAL 8 OUTPUT
+
+
+   TECHNICAL 8 OUTPUT FOR BAYES ESTIMATION
+
+     CHAIN    BSEED
+     1        0
+     2        285380
+     3        253358
+     4        93468
+
+                     POTENTIAL       PARAMETER WITH
+     ITERATION    SCALE REDUCTION      HIGHEST PSR
+     100              1.013               7
+     200              1.005               4
+     300              1.002               4
+     400              1.006               4
+     500              1.003               9
+     600              1.002               9
+     700              1.000               10
+     800              1.000               1
+     900              1.000               1
+     1000             1.000               1
+     1100             1.000               1
+     1200             1.000               2
+     1300             1.001               2
+     1400             1.001               2
+     1500             1.001               2
+     1600             1.001               2
+     1700             1.000               2
+     1800             1.000               2
+     1900             1.001               2
+     2000             1.001               2
+
+
+SAVEDATA INFORMATION
+
+
+  Bayesian Parameters
+
+  Save file
+    draws.dat
+  Save format      Free
+
+  Order of parameters saved
+
+    Chain number
+    Iteration number
+    Parameter 1, %WITHIN%: X ON Y
+    Parameter 2, %WITHIN%: X ON X&1
+    Parameter 3, %WITHIN%: Y ON X&1
+    Parameter 4, %WITHIN%: Y ON Y&1
+    Parameter 5, %WITHIN%: X
+    Parameter 6, %WITHIN%: Y
+    Parameter 7, %BETWEEN%: [ X ]
+    Parameter 8, %BETWEEN%: [ Y ]
+    Parameter 9, %BETWEEN%: X
+    Parameter 10, %BETWEEN%: Y WITH X
+    Parameter 11, %BETWEEN%: Y
+    STDYX, %WITHIN%: X ON Y
+    STDYX, %WITHIN%: X ON X&1
+    STDYX, %WITHIN%: Y ON X&1
+    STDYX, %WITHIN%: Y ON Y&1
+    STDYX, %WITHIN%: X
+    STDYX, %WITHIN%: Y
+    STDYX, %BETWEEN%: [ X ]
+    STDYX, %BETWEEN%: [ Y ]
+    STDYX, %BETWEEN%: X
+    STDYX, %BETWEEN%: Y WITH X
+    STDYX, %BETWEEN%: Y
+    R-SQUARE, %WITHIN%: X
+    R-SQUARE, %WITHIN%: Y
+    R-SQUARE, %BETWEEN%: X
+    R-SQUARE, %BETWEEN%: Y
+
+     Beginning Time:  11:44:20
+        Ending Time:  11:44:23
+       Elapsed Time:  00:00:03
+
+
+
+MUTHEN & MUTHEN
+3463 Stoner Ave.
+Los Angeles, CA  90066
+
+Tel: (310) 391-9971
+Fax: (310) 391-8971
+Web: www.StatModel.com
+Support: Support@StatModel.com
+
+Copyright (c) 1998-2023 Muthen & Muthen
