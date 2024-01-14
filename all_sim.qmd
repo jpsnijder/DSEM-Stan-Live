@@ -27,17 +27,18 @@ source("source/rlkjcorr.R")
 source("source/loadFunction.R")
 LoadFunction(file="source/results.r", rhat_comp_F_MP, est_comp_F_MP)
 
-set_cmdstan_path(file.path("C:/ProgramData/cmdstan-2.33.1"))
+set_cmdstan_path(file.path("C:/ProgramData/cmdstan-2.33.1")) # set local cmdstan location
 
+# Parameters that are held constant across modeling of all 6 models
 set.seed(123)
 N_subj = 100
 N_obs = 50
-
 varsNames = c("X", "Y", "phi_X", "phi_Y", "phi_XY", "beta_YX", "psi_X", "psi_Y")
 
-# should become a source function
-# this is for the within structure of the Hamaker et al., 2023 book chapter.
-# it is the same across all 6 models.
+# Simulate the within-level structure of the Hamaker et al., 2023 book chapter models.
+# Remains the same across all 6 models.
+# Written by Valentin Pratz
+
 simulate_within <- function(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, psi_Y, N_obs) {
   X = rnorm(n=N_obs, 0, psi_X)
   Y = rnorm(n=N_obs, 0, psi_Y)
@@ -52,6 +53,7 @@ simulate_within <- function(mu_X, mu_Y, phi_X, phi_Y, phi_XY, beta_YX, psi_X, ps
   return(list(X=X,Y=Y))
 }
 
+# Function to check divergences in data simulations
 data_summary_plot <- function(X,Y) {
   par(mfrow=c(2,1), mar=c(4,4,0,0))
   plot(1:N_obs, apply(X, 2, min), ylim = c(min(X),max(X)), type='b', xlab = "", "ylab" = "X")
@@ -63,7 +65,6 @@ data_summary_plot <- function(X,Y) {
 }
 ```
 
-Then we can set some general parameters that will be the same across the simulations:
 
 ```{r}
 #| label: params
@@ -74,6 +75,9 @@ modelName = "hamaker model 1"
 # Model 1
 ## Simulating data
 In the first part of this tutorial, we will work with simulated data for two main reasons: First, when using simulated data, the *generating parameter values* (sometimes denoted as *ground truth*) are known. Thereby we can check the recovery of the chosen set of parameters. Second, we are free to specify the characteristics of the data set (number of subjects, variables, measurement points, ...). To keep this tutorial concise, we will stick to the most simple case and use bivariate data. Please refer to the paper for reference on which parameters indicate what:
+
+For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+
 ```{r}
 #| label: simulate-parameters-1
 phi_X = .2
@@ -110,8 +114,6 @@ for (i in 1:N_subj) {
   X[i,] = subj_data$X
   Y[i,] = subj_data$Y
 }
-
-# For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
 
 data_summary_plot(X,Y)
 
