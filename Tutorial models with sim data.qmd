@@ -10,6 +10,8 @@ format:
     embed-resources: true
 ---
 
+In the first part of our tutorial (testing our Stan models against the Mplus equivalents), we will work with simulated data for two main reasons: First, when using simulated data, the *generating parameter values* (sometimes denoted as *ground truth*) are known. Thereby we can check the recovery of the chosen set of parameters. Second, we are free to specify the characteristics of the data set (number of subjects, variables, measurement points, ...). To keep this tutorial concise, we will stick to the most simple case and use bivariate data. Please refer to the paper (manuscript in prep) for reference on which parameters indicate what. Open  the code block to see the code. *A great thanks go to my research assistant Valentin Pratz for setting up the simulations and help in Stan code.*
+
 First, load the libraries and functions that will be needed later on:
 ```{r}
 #| label: setup
@@ -74,9 +76,7 @@ modelName = "hamaker model 1"
 
 # Model 1
 ## Simulating data
-In the first part of this tutorial, we will work with simulated data for two main reasons: First, when using simulated data, the *generating parameter values* (sometimes denoted as *ground truth*) are known. Thereby we can check the recovery of the chosen set of parameters. Second, we are free to specify the characteristics of the data set (number of subjects, variables, measurement points, ...). To keep this tutorial concise, we will stick to the most simple case and use bivariate data. Please refer to the paper for reference on which parameters indicate what:
-
-For certain some of parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
+For certain parameters, the time series might diverge. We can check graphically if that occurred. If a divergent time series is present, we would see exploding minimum or maximum values for later time steps. As this doesn't occur in reality, it would indicate an invalid simulation. Here, the pattern looks reasonable, so we can use this simulated data set.
 
 ```{r}
 #| label: simulate-parameters-1
@@ -132,6 +132,7 @@ data_list = list(
 
 Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
 ```{r}
+#| output: false
 model_1 <- cmdstan_model('stan/1_full.stan')
 path_1 <- 'fits/model1'
 dir.create(path_1, recursive = TRUE, showWarnings = FALSE)
@@ -189,8 +190,9 @@ if (length(list.files(path_mplus)) > 0) { # here
 
 
 ## Results
-To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
+To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to 1 (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero. Divergences are zero unless otherwise reported here. In this case (and in the following 5), no divergences were found.
 ```{r}
+#| warning: false
 # Plots - rhat
 rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
                mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
@@ -198,6 +200,7 @@ rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"),
 ```
 
 ```{r}
+#| warning: false
 # Plots - rhat
 est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
                fit = fit_1) # here
@@ -273,6 +276,7 @@ data_list = list(
 
 Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
 ```{r}
+#| output: false
 model_2 <- cmdstan_model('stan/2_full.stan')
 path_2 <- 'fits/model2'
 dir.create(path_2, recursive = TRUE, showWarnings = FALSE)
@@ -331,6 +335,7 @@ if (length(list.files(path_mplus)) > 0) { # here
 ## Results
 To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
 ```{r}
+#| warning: false
 # Plots - rhat
 rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
                mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
@@ -338,6 +343,7 @@ rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"),
 ```
 
 ```{r}
+#| warning: false
 # Plots - rhat
 est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
                fit = fit_2) # here
@@ -420,6 +426,7 @@ data_list = list(
 
 Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
 ```{r}
+#| output: false
 model_3 <- cmdstan_model('stan/3_full.stan')
 path_3 <- 'fits/model3'
 dir.create(path_3, recursive = TRUE, showWarnings = FALSE)
@@ -479,6 +486,7 @@ if (length(list.files(path_mplus)) > 0) { # here
 ## Results
 To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
 ```{r}
+#| warning: false
 # Plots - rhat
 rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
                mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
@@ -486,6 +494,7 @@ rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"),
 ```
 
 ```{r}
+#| warning: false
 # Plots - rhat
 est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
                fit = fit_3) # here
@@ -566,6 +575,7 @@ data_list = list(
 
 Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
 ```{r}
+#| output: false
 model_4 <- cmdstan_model('stan/4_full.stan')
 path_4 <- 'fits/model4'
 dir.create(path_4, recursive = TRUE, showWarnings = FALSE)
@@ -624,6 +634,7 @@ if (length(list.files(path_mplus)) > 0) { # here
 ## Results
 To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
 ```{r}
+#| warning: false
 # Plots - rhat
 rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
                mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
@@ -631,6 +642,7 @@ rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"),
 ```
 
 ```{r}
+#| warning: false
 # Plots - rhat
 est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
                fit = fit_4) # here
@@ -721,6 +733,7 @@ data_list = list(
 
 Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
 ```{r}
+#| output: false
 model_5 <- cmdstan_model('stan/5_full.stan')
 path_5 <- 'fits/model5'
 dir.create(path_5, recursive = TRUE, showWarnings = FALSE)
@@ -781,6 +794,7 @@ if (length(list.files(path_mplus)) > 0) { # here
 ## Results
 To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
 ```{r}
+#| warning: false
 # Plots - rhat
 rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
                mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
@@ -788,6 +802,7 @@ rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"),
 ```
 
 ```{r}
+#| warning: false
 # Plots - rhat
 est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
                fit = fit_5) # here
@@ -875,6 +890,7 @@ data_list = list(
 
 Next, we can compile the model and fit the data. As this model family is a bit more complicated, fitting takes some time:
 ```{r}
+#| output: false
 model_6 <- cmdstan_model('stan/6_full.stan')
 path_6 <- 'fits/model6'
 dir.create(path_6, recursive = TRUE, showWarnings = FALSE)
@@ -935,6 +951,7 @@ if (length(list.files(path_mplus)) > 0) { # here
 ## Results
 To assess whether fitting was successful, we consider two main measures. First, the $\widehat R$ values should be close to one (the most recent advice is a strict criterion of $\widehat R < 1.01$). Second, the proportion of divergent transitions, which in the best case should be zero.
 ```{r}
+#| warning: false
 # Plots - rhat
 rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"), 
                mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
@@ -942,8 +959,22 @@ rhat_comp_F_MP(TRUE, mplusDraws = paste0(path_mplus, "/draws.dat"),
 ```
 
 ```{r}
+#| warning: false
 # Plots - rhat
 est_comp_F_MP(TRUE, mplusOut = paste0(path_mplus, "/model_", modelNr, ".out"), 
                fit = fit_6) # here
 ```
+
+# Short discussion
+In evaluating the convergence of our Stan models, the results indicate a satisfactory performance overall. The sampler reported no divergences, suggesting robust model behavior. While a small proportion of $\widehat R$ values marginally exceed the preferred threshold of 1.01, this is not a cause for significant concern. Enhancing model convergence could be achieved by approximately a 20% increase in the number of iterations. It's noteworthy, however, that the more complex models, specifically models 4 and 6, exhibit suboptimal convergence for certain parameters. Although these parameters are not central to our primary interests, the convergence is notably less efficient compared to the results obtained using Mplus. Regarding computational efficiency, the difference between Stan and Mplus diminishes as model complexity increases.
+
+Regarding parameter recovery, the comparison between Stan and Mplus for the simpler models (1, 2, and 3) shows negligible discrepancies. However, the more complex models (4, 5, and 6) exhibit greater variance in results between the two methods. This divergence does not currently raise substantial concerns but warrants attention. This variance may be attributed to the inherent instability in Dynamic Structural Equation Modeling (DSEM), as discussed by Baral & Curran (2023) in their article "Dynamic Structural Equation Models: Promising Yet Concerning" [available here](https://ajuronline.org/uploads/Volume_20_3/AJUR_Vol_20_Issue_3_Dec_2023_p69.pdf). A comprehensive analysis and discussion of these findings will be included in our forthcoming tutorial paper. But also see the supplementary .html file provided in this repository.
+
+
+
+
+
+
+
+
 
