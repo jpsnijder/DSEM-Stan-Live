@@ -1,0 +1,180 @@
+---
+title: "100 runs on Simulated DSEM Data"
+format:
+  html:
+    toc: true
+    number-sections: true
+    colorlinks: true
+    code-fold: true
+    code-summary: "Show the code"
+    embed-resources: true
+---
+
+This document presents an extended analysis of parameter recovery in six Dynamic Structural Equation Models (DSEM) as detailed in Hamaker et al.'s 2023 book chapter. For a comprehensive understanding, please refer to the preceding .html document, which introduces the observation that parameter recovery accuracy varies with different seed settings. This phenomenon has been similarly noted by Baral & Curran (2023) in their publication "Dynamic Structural Equation Models: Promising Yet Concerning," accessible here: [AJUR Online](https://ajuronline.org/uploads/Volume_20_3/AJUR_Vol_20_Issue_3_Dec_2023_p69.pdf). In this analysis, I have executed 100 distinct seed iterations across all six models, utilizing both Stan and Mplus for simulation. Presented herein are the density distributions derived from the outputs of these 100 simulations. It is important to note that this script is designed for data analysis and does not sample; it solely processes the output data from these simulations. 
+
+## Packages and Parameters
+
+First, load the libraries and functions that will be needed later on. Additionally, read in ground truth parameters values here.
+```{r class.source = 'fold-show'}
+#| label: setup
+#| output: false
+library(tidyverse) 
+library(MplusAutomation)
+library(cmdstanr)
+library(bayesplot)
+library(RColorBrewer)
+library(MASS)
+library(igraph)
+library(ggpubr)
+
+source("source/loadFunction.R") #custom function to load functions from source folder
+LoadFunction(file="source/results.r", est_100_comb) # load the plot function
+LoadFunction(file="source/extractData.r", extractData) # load the extract data function
+
+varsNames = c("X", "Y", "phi_X", "phi_Y", "phi_XY", "beta_YX", "psi_X", "psi_Y")
+'%out%' <- Negate('%in%')
+
+# standard deviation for the mean + X stdDev data pre-processing.
+stdIn = 3
+
+# Ground Truth values for simulation
+# Range of parameters taken from Hamaker et al., 2018
+## https://doi.org/10.1080/00273171.2018.1446819
+mu_phi_X = .2
+mu_phi_Y = .25
+mu_phi_XY = .05
+mu_beta_YX = 0.3
+
+mu_log_psi_X_2 = -1.6
+mu_log_psi_Y_2 = -1.4
+
+mu_X = 3.0
+mu_Y = 1.0
+
+# Ground Truth in vector gamma
+gamma = c(mu_X, mu_Y, mu_phi_X, mu_phi_Y, mu_phi_XY, mu_beta_YX, mu_log_psi_X_2, mu_log_psi_Y_2)
+```
+
+
+
+# Model 1
+## Extract Data & Convergence Stats
+
+```{r}
+#| label: Model 1
+modelNr = 1
+modelName = "Hamaker 2018 model 1"
+# Extract data function stored in source folder
+extractData()
+```
+
+## Results
+```{r}
+#| warning=FALSE
+# Plot function in source folder
+est_100_comb(savePlots = FALSE) 
+```
+
+
+
+
+# Model 2
+## Extract Data & Convergence Stats
+```{r}
+#| label: Model 2
+modelNr = 2
+modelName = "Hamaker 2018 model 2"
+# Extract data function stored in source folder
+extractData()
+```
+
+## Results
+```{r}
+#| warning=FALSE
+# Plot function in source folder
+est_100_comb(savePlots = FALSE) 
+```
+
+
+
+
+# Model 3
+## Extract Data & Convergence Stats
+```{r}
+#| label: Model 3
+modelNr = 3
+modelName = "Hamaker 2018 model 3"
+# Extract data function stored in source folder
+extractData()
+```
+
+## Results
+
+```{r}
+#| warning=FALSE
+# Plot function in source folder
+est_100_comb(savePlots = FALSE) 
+```
+
+
+
+# Model 4
+## Extract Data & Convergence Stats
+```{r}
+#| label: Model 4
+modelNr = 4
+modelName = "Hamaker 2018 model 4"
+# Extract data function stored in source folder
+extractData()
+```
+
+## Results
+
+```{r}
+#| warning=FALSE
+# Plot function in source folder
+est_100_comb(savePlots = FALSE) 
+```
+
+
+
+# Model 5
+## Extract Data & Convergence Stats
+```{r}
+#| label: Model 5
+modelNr = 5
+modelName = "Hamaker 2018 model 5"
+# Extract data function stored in source folder
+extractData()
+```
+
+## Results
+
+```{r}
+#| warning=FALSE
+# Plot function in source folder
+est_100_comb(savePlots = FALSE) 
+```
+
+
+# Model 6
+## Extract Data & Convergence Stats
+```{r}
+#| label: Model 6
+modelNr = 6
+modelName = "Hamaker 2018 model 6"
+# Extract data function stored in source folder
+extractData()
+```
+
+## Results
+
+```{r}
+#| warning=FALSE
+# Plot function in source folder
+est_100_comb(savePlots = FALSE) 
+```
+
+# Short Discussion
+In all tested models and for each parameter, the results indicate that both Stan and Mplus are quite effective in recovering the ground truth values. While there might be slight deviations in individual runs, none of the results exhibit significant anomalies that fall outside the credibility intervals. This consistency demonstrates that the Stan models are comparable to the Mplus models in terms of parameter recovery accuracy. It's noteworthy that in these simulations, Stan's processing time is considerably longer than Mplus's, approximately tenfold. The underlying reasons for this discrepancy will be elaborated in the final paper. This difference in processing time is not a cause for concern; it primarily stems from the variance in the samplers and priors used by Mplus and Stan, along with a more extended and slower warmup period in Stan's sampler.
+

@@ -1,5 +1,6 @@
 # Ben Bolker's rLKJ function from emdbook package, copied from Richard
-# McElreath's rethinking package on GitHub. Taken from the trialr package
+# McElreath's rethinking package on GitHub. Taken from the trialr package.
+# Valentin Pratz
 
 
 #' Sample LKJ correlation matrices.
