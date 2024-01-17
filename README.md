@@ -11,7 +11,7 @@ A PDF of the chapter made available by the authors themself here: [PDF](https://
 
 N.B., make sure to the open the Rproject file first, as all paths are relative to the location of that file.
 
-My presentations might be of help as well and can be found at [GITHUB](https://github.com/jpsnijder/conference-materials), look for the ESCoP, FGME, and MathPsych 2023 presentations. 
+My presentations might be of help as well and can be found here on [github](https://github.com/jpsnijder/conference-materials), look for the ESCoP, FGME, and MathPsych 2023 presentations. 
 
 
 
